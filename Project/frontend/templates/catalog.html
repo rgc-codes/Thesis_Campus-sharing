@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+
+{% block title %}Catalog - Equipment Circulation{% endblock %}
+
+{% block content %}
+<main class="max-w-[1440px] mx-auto px-6 sm:px-8 py-10">
+
+    <!-- Header Section -->
+    <div class="flex flex-col lg:flex-row justify-between items-start gap-6 mb-10">
+        <div class="max-w-2xl">
+            <div class="inline-flex items-center gap-2 text-[10px] font-bold tracking-widest text-slate-500 uppercase mb-3">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Term 2 Circulation Active &middot; Fall 2025
+            </div>
+            <h1 class="text-3xl font-semibold tracking-tight text-slate-900 mb-3">Equipment Lending Catalog</h1>
+            <p class="text-slate-500 text-sm leading-relaxed">Reserve laboratory-grade gear, field sensors, and production hardware for accredited coursework, studio assignments, and faculty-approved research.</p>
+        </div>
+
+        <div class="flex flex-wrap gap-4">
+            <div class="bg-white border border-borderline rounded-xl px-5 py-3.5 flex items-center gap-4 shadow-sm min-w-[140px] h-20">
+                <div class="text-2xl font-semibold text-slate-900">{{ total_items_count }}</div>
+                <div class="text-[10px] text-slate-500 font-bold uppercase tracking-wider leading-tight">Catalog<br>Assets</div>
+            </div>
+            <div class="bg-white border border-borderline rounded-xl px-5 py-3.5 flex items-center gap-4 shadow-sm min-w-[140px] h-20">
+                <div class="text-2xl font-semibold text-slate-900">72<span class="text-sm text-slate-400 font-normal ml-0.5">hrs</span></div>
+                <div class="text-[10px] text-slate-500 font-bold uppercase tracking-wider leading-tight">Default<br>Max Loan</div>
+            </div>
+            <div class="bg-white border border-borderline rounded-xl px-5 py-3.5 flex items-center gap-4 shadow-sm min-w-[140px] h-20">
+                <div class="text-slate-400 shrink-0">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4">
+                        </path>
+                    </svg>
+                </div>
+                <div>
+                    <div class="text-sm font-semibold text-slate-900">Desk A</div>
+                    <div class="text-[10px] text-slate-500 font-bold uppercase tracking-wider mt-0.5">Tech Hub &middot; L1</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search & Filter Controls -->
+    <form method="GET" action="{% url 'catalog' %}" class="mb-8">
+        <div class="flex flex-col md:flex-row gap-3 mb-4">
+            <div class="relative flex-1">
+                <svg class="absolute left-4 top-3 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                <input type="text" name="q" value="{{ request.GET.q|default:'' }}"
+                    placeholder="Search equipment, sensors, cinema lenses, serial numbers..."
+                    class="h-10 w-full bg-white border border-borderline rounded-xl py-2 pl-10 pr-4 text-xs font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 shadow-sm transition-all">
+            </div>
+            <div class="flex gap-3">
+                <label class="h-10 inline-flex items-center gap-2 bg-white border border-borderline rounded-xl px-4 text-xs font-medium text-slate-700 shadow-sm cursor-pointer hover:bg-slate-50 transition-colors shrink-0">
+                    <input type="checkbox" name="in_stock" value="true" {% if request.GET.in_stock %}checked{% endif %}
+                        class="hidden peer" onchange="this.form.submit()">
+                    <span class="w-2 h-2 rounded-full bg-slate-300 peer-checked:bg-emerald-500 transition-colors"></span>
+                    In Stock Only
+                </label>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+            <button type="submit" name="category" value=""
+                class="h-8 inline-flex items-center justify-center px-3.5 rounded-full text-xs font-medium transition-colors shadow-sm cursor-pointer {% if not request.GET.category %}bg-slate-900 text-white{% else %}bg-white border border-borderline text-slate-700 hover:bg-slate-50{% endif %}">
+                All Equipment ({{ total_items_count }})
+            </button>
+            {% for cat in categories %}
+            <button type="submit" name="category" value="{{ cat.id }}"
+                class="h-8 inline-flex items-center justify-center px-3.5 rounded-full text-xs font-medium transition-colors shadow-sm cursor-pointer {% if request.GET.category == cat.id|stringformat:'s' %}bg-slate-900 text-white{% else %}bg-white border border-borderline text-slate-700 hover:bg-slate-50{% endif %}">
+                {{ cat.name }}
+            </button>
+            {% endfor %}
+        </div>
+    </form>
+
+    <!-- Results Count -->
+    <div class="flex justify-between items-center text-[10px] font-bold tracking-widest text-slate-500 uppercase mb-6 border-b border-borderline pb-3">
+        <span>Showing {{ items|length }} Catalog Assets</span>
+        <span class="flex items-center gap-1.5 text-slate-600">
+            <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z">
+                </path>
+            </svg>
+            Student Access: Active
+        </span>
+    </div>
+
+    <!-- Catalog Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-stretch">
+        {% for item in items %}
+        <article class="bg-white border border-borderline rounded-2xl p-6 flex flex-col shadow-sm hover:shadow-md transition-all duration-300 h-full group">
+
+            <!-- Card Thumbnail with High-Res Hardware Photography -->
+            <div class="aspect-[4/3] w-full overflow-hidden rounded-xl bg-slate-100 relative shrink-0 mb-5 border border-slate-100 shadow-inner">
+                <span class="absolute top-2.5 left-2.5 z-10 bg-white/95 backdrop-blur text-[9px] font-bold px-2 py-0.5 rounded-md text-slate-700 uppercase tracking-wider shadow-sm border border-slate-200/80">
+                    {{ item.category.name|slice:":3"|upper }}-{{ item.id|stringformat:"04d" }}
+                </span>
+                <img src="{{ item.image_url|default:'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=800&q=80' }}" 
+                     alt="{{ item.name }}" 
+                     loading="lazy"
+                     class="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105" />
+            </div>
+
+            <!-- Metadata -->
+            <div class="text-[10px] font-bold tracking-widest text-slate-500 uppercase mb-1">
+                {{ item.category.name }}
+            </div>
+            <h2 class="text-base font-semibold text-slate-900 mb-1.5 leading-snug truncate" title="{{ item.name }}">{{ item.name }}</h2>
+            <p class="text-xs text-slate-500 line-clamp-2 h-8 mb-5 leading-relaxed">{{ item.description|default:"Standard university laboratory gear configured for coursework and faculty-approved research." }}</p>
+
+            <!-- Specifications List -->
+            <ul class="text-xs flex flex-col gap-2 mb-5 border-t border-slate-100 pt-4">
+                <li class="flex justify-between items-center">
+                    <span class="text-slate-500 flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                        </svg>
+                        Total Inventory
+                    </span>
+                    <span class="font-medium text-slate-900">{{ item.total_quantity }} unit(s)</span>
+                </li>
+                <li class="flex justify-between items-center">
+                    <span class="text-slate-500 flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Default Loan Window
+                    </span>
+                    <span class="font-medium text-slate-900">48 hours</span>
+                </li>
+                <li class="flex justify-between items-center">
+                    <span class="text-slate-500 flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"></path>
+                        </svg>
+                        Clearance Level
+                    </span>
+                    <span class="font-medium text-slate-900">Student ID Barcode</span>
+                </li>
+            </ul>
+
+            <!-- Laser-Aligned Bottom Action Bar -->
+            <div class="mt-auto flex items-center justify-between pt-4 border-t border-slate-100">
+                {% if item.available_quantity > 0 %}
+                <span class="h-6 inline-flex items-center gap-1.5 bg-[#ECFDF5] text-[#065F46] px-2.5 py-0.5 rounded-full text-xs font-medium border border-[#A7F3D0]">
+                    <span class="w-1.5 h-1.5 rounded-full bg-[#10B981]"></span>
+                    {{ item.available_quantity }} Available
+                </span>
+                {% else %}
+                <span class="h-6 inline-flex items-center gap-1.5 bg-slate-100 text-slate-500 px-2.5 py-0.5 rounded-full text-xs font-medium border border-slate-200">
+                    <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                    Out of Stock
+                </span>
+                {% endif %}
+
+                <a href="{% url 'reserve_item' item.id %}"
+                    class="h-9 inline-flex items-center justify-center px-4 bg-slate-900 text-white text-xs font-medium rounded-lg hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 shadow-sm cursor-pointer gap-1.5 group/btn">
+                    <svg class="w-3.5 h-3.5 text-amber-300 transition-transform group-hover/btn:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    Reserve
+                </a>
+            </div>
+        </article>
+        {% empty %}
+        <div class="col-span-full py-16 flex flex-col items-center justify-center text-center bg-white border border-borderline rounded-2xl border-dashed">
+            <svg class="w-10 h-10 text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                    d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4">
+                </path>
+            </svg>
+            <h3 class="text-sm font-semibold text-slate-900 mb-1">No equipment found</h3>
+            <p class="text-xs text-slate-500">Try adjusting your search criteria or category filters.</p>
+            <a href="{% url 'catalog' %}" class="mt-3 text-xs font-semibold text-emerald-600 hover:text-emerald-700">Clear all filters</a>
+        </div>
+        {% endfor %}
+    </div>
+</main>
+{% endblock %}

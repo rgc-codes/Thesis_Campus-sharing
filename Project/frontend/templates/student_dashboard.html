@@ -1,0 +1,297 @@
+{% extends 'base.html' %}
+
+{% block title %}My Loans - Equipment Circulation{% endblock %}
+
+{% block content %}
+<main class="max-w-[1440px] mx-auto px-6 sm:px-8 py-8">
+
+    <!-- Header -->
+    <div class="text-[10px] font-bold tracking-widest text-slate-500 uppercase mb-2">
+        Student Portal &middot; Equipment Activity
+    </div>
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight text-slate-900 mb-1">Personal Equipment Dashboard</h1>
+            <p class="text-xs text-slate-500">Track active loans in custody, upcoming pickup appointments, and digital verification passes.</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <a href="{% url 'catalog' %}"
+                class="h-9 inline-flex items-center justify-center px-3.5 rounded-lg text-xs font-medium bg-white border border-borderline text-slate-700 hover:bg-slate-50 transition-colors shadow-sm gap-2">
+                <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Browse Catalog
+            </a>
+        </div>
+    </div>
+
+    <!-- Top Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <!-- Active Checked Out -->
+        <div class="bg-white border border-borderline rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[170px] hover:shadow-md transition-shadow">
+            <div class="flex justify-between items-start mb-3">
+                <div class="text-[10px] font-bold tracking-widest text-slate-500 uppercase">Active In Custody</div>
+                <div class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 shrink-0 shadow-sm">
+                    <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"
+                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4">
+                        </path>
+                    </svg>
+                </div>
+            </div>
+            <div>
+                <div class="text-3xl font-semibold text-slate-900 mb-1">{{ active_count|default:0 }}</div>
+                <div class="text-xs text-slate-500 mb-2">{{ active_count|default:0 }} item(s) checked out &middot; <span class="{% if overdue_count > 0 %}text-red-600 font-semibold{% endif %}">{{ overdue_count|default:0 }} overdue</span></div>
+                <div class="flex items-center gap-1.5 text-xs font-medium {% if overdue_count == 0 %}text-emerald-600{% else %}text-red-600{% endif %}">
+                    <span class="w-1.5 h-1.5 rounded-full {% if overdue_count == 0 %}bg-emerald-500{% else %}bg-red-500{% endif %}"></span>
+                    {% if overdue_count == 0 %}Borrowing account in good standing{% else %}Action required: return overdue equipment{% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Next Return Deadline (With Countdown Clock Icon) -->
+        <div class="bg-white border border-borderline rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[170px] hover:shadow-md transition-shadow">
+            <div class="flex justify-between items-start mb-3">
+                <div class="text-[10px] font-bold tracking-widest text-slate-500 uppercase">Next Return Deadline</div>
+                {% if next_deadline %}
+                <span class="h-6 inline-flex items-center gap-1.5 bg-[#FFFBEB] text-[#D97706] px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border border-[#FDE68A]">
+                    <svg class="w-3.5 h-3.5 text-[#D97706] animate-spin" style="animation-duration: 12s;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    {{ next_deadline|timeuntil }} left
+                </span>
+                {% else %}
+                <div class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                {% endif %}
+            </div>
+            <div>
+                {% if pass_reservation %}
+                <div class="text-2xl font-semibold text-slate-900 mb-1 flex items-baseline gap-2">
+                    {{ pass_reservation.end_time|date:"M d, H:i" }}
+                    <span class="text-xs font-normal text-slate-400">Media Lab 201</span>
+                </div>
+                <div class="text-xs text-slate-500 mb-2">Cutoff inspection required before station closes.</div>
+                <div class="text-xs text-slate-400 flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    {% if pass_reservation.status == 'APPROVED' %}Pickup authorized &middot; Present pass at Station 01{% else %}Due back before cutoff time{% endif %}
+                </div>
+                {% elif next_deadline %}
+                <div class="text-2xl font-semibold text-slate-900 mb-1">{{ next_deadline|date:"M d, H:i" }}</div>
+                <div class="text-xs text-slate-500 mb-2">Media Lab Building 4 &middot; Room 201</div>
+                <div class="text-xs text-slate-400">Scheduled return window</div>
+                {% else %}
+                <div class="text-lg font-medium text-slate-400 mb-1">No upcoming deadlines</div>
+                <div class="text-xs text-slate-400">You currently have no active or pending loans.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Trust Standing (With Glowing Shield Icon) -->
+        <div class="bg-white border border-borderline rounded-2xl p-6 shadow-sm flex flex-col justify-between min-h-[170px] hover:shadow-md transition-shadow">
+            <div class="flex justify-between items-start mb-3">
+                <div class="text-[10px] font-bold tracking-widest text-slate-500 uppercase">Campus Trust Standing</div>
+                <div class="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 shadow-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"
+                            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z">
+                        </path>
+                    </svg>
+                </div>
+            </div>
+            <div>
+                <div class="text-3xl font-semibold text-slate-900 mb-1">{{ trust_score }} <span class="text-sm text-slate-400 font-normal">/ 100</span></div>
+                <div class="text-xs text-slate-500 mb-2">Tier 1 &middot; Priority checkout privileges enabled</div>
+                <div class="text-xs text-emerald-600 flex items-center gap-1.5 font-medium">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    0 incidents &middot; 14 clean returns
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Layout -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        <!-- Left Column: Current Loans & Upcoming -->
+        <div class="lg:col-span-2 space-y-8">
+
+            <!-- Active Borrowed Items -->
+            <section>
+                <div class="flex justify-between items-center mb-4">
+                    <div class="text-[10px] font-bold tracking-widest text-slate-500 uppercase flex items-center gap-2">
+                        Active Custody Items
+                        <span class="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-full text-[10px]">{{ active_count|default:0 }}</span>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    {% for data in active_data %}
+                    <div class="bg-white border border-borderline rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                        <div class="flex gap-5 mb-5">
+                            <!-- Real Hardware Photography Thumbnail -->
+                            <div class="w-24 h-20 bg-slate-100 rounded-xl border border-slate-200/80 flex-shrink-0 relative overflow-hidden shadow-inner">
+                                <span class="absolute top-1.5 left-1.5 z-10 bg-black/75 text-white text-[8px] font-bold px-1.5 py-0.5 rounded uppercase">
+                                    {{ data.reservation.item.category.name|slice:":3" }}
+                                </span>
+                                {% if data.reservation.item.image_url %}
+                                <img src="{{ data.reservation.item.image_url }}" alt="{{ data.reservation.item.name }}" class="w-full h-full object-cover" />
+                                {% else %}
+                                <div class="w-full h-full flex items-center justify-center text-slate-300">
+                                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                            d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z">
+                                        </path>
+                                    </svg>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="flex-grow min-w-0">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-600">In Custody</span>
+                                    <span class="text-[10px] font-mono text-slate-400">Kit #{{ data.reservation.id|stringformat:"04d" }}</span>
+                                </div>
+                                <h3 class="text-base font-semibold text-slate-900 mb-1 truncate" title="{{ data.reservation.item.name }}">{{ data.reservation.item.name }}</h3>
+                                <div class="text-xs text-slate-500 flex items-center gap-1.5">
+                                    <span>Issued: {{ data.reservation.start_time|date:"M d, H:i" }}</span>
+                                    <span>&middot;</span>
+                                    <span>Due: <strong class="text-slate-800">{{ data.reservation.end_time|date:"M d, H:i" }}</strong></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Progress Bar -->
+                        <div>
+                            <div class="flex justify-between text-[10px] font-bold tracking-widest uppercase mb-1.5">
+                                <span class="text-slate-500">Loan Window Elapsed ({{ data.progress }}%)</span>
+                                <span class="{% if data.is_overdue %}text-red-600{% else %}text-[#D97706]{% endif %}">
+                                    {% if data.is_overdue %}Overdue{% else %}{{ data.remaining_hours }} hour(s) remaining{% endif %}
+                                </span>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-1.5 mb-1.5 overflow-hidden">
+                                <div class="h-1.5 rounded-full {% if data.is_overdue %}bg-red-500{% else %}bg-[#D97706]{% endif %}"
+                                    style="width: {{ data.progress }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="bg-white border border-borderline rounded-2xl p-8 text-center border-dashed">
+                        <p class="text-xs text-slate-500">No active equipment loans in custody right now.</p>
+                        <a href="{% url 'catalog' %}" class="mt-2 inline-block text-xs font-semibold text-emerald-600 hover:text-emerald-700">Browse lending catalog &rarr;</a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <!-- Upcoming Reservations -->
+            <section>
+                <div class="text-[10px] font-bold tracking-widest text-slate-500 uppercase mb-3 flex items-center gap-2">
+                    Upcoming Bookings
+                    <span class="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-full text-[10px]">{{ upcoming_reservations|length }}</span>
+                </div>
+                <div class="space-y-3">
+                    {% for res in upcoming_reservations %}
+                    <div class="bg-white border border-borderline rounded-xl px-5 py-3.5 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow">
+                        <div class="flex items-center gap-3.5 min-w-0">
+                            <div class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 overflow-hidden flex items-center justify-center text-slate-400 shrink-0">
+                                {% if res.item.image_url %}
+                                <img src="{{ res.item.image_url }}" alt="{{ res.item.name }}" class="w-full h-full object-cover" />
+                                {% else %}
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"
+                                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                </svg>
+                                {% endif %}
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-xs font-semibold text-slate-900 truncate max-w-[240px]" title="{{ res.item.name }}">{{ res.item.name }}</div>
+                                <div class="text-[11px] text-slate-500">{{ res.start_time|date:"M d, H:i" }} &ndash; {{ res.end_time|date:"M d, H:i" }}</div>
+                            </div>
+                        </div>
+                        <div class="shrink-0">
+                            {% if res.status == 'APPROVED' %}
+                            <span class="h-6 inline-flex items-center gap-1.5 bg-[#ECFDF5] text-[#059669] px-2.5 py-0.5 rounded-full text-xs font-medium border border-[#A7F3D0]">
+                                <span class="w-1.5 h-1.5 rounded-full bg-[#10B981]"></span> Pickup Ready
+                            </span>
+                            {% else %}
+                            <span class="h-6 inline-flex items-center gap-1.5 bg-[#FFFBEB] text-[#D97706] px-2.5 py-0.5 rounded-full text-xs font-medium border border-[#FDE68A]">
+                                <span class="w-1.5 h-1.5 rounded-full bg-[#F59E0B]"></span> Pending
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="bg-white border border-borderline rounded-xl p-5 text-center border-dashed">
+                        <p class="text-xs text-slate-500">No scheduled upcoming reservations.</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+
+        <!-- Right Column: Digital Verification Pass (With QR Glyph Icon) -->
+        <div>
+            <div class="bg-white border border-borderline rounded-2xl p-6 shadow-sm sticky top-20">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="text-[10px] font-bold tracking-widest text-slate-500 uppercase flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
+                        </svg>
+                        Digital Verification Pass
+                    </div>
+                    {% if pass_reservation %}
+                        {% if pass_reservation.status == 'APPROVED' %}
+                        <span class="h-5 inline-flex items-center px-2 rounded text-[10px] font-bold uppercase tracking-wide bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]">
+                            Pickup Pass
+                        </span>
+                        {% elif pass_reservation.status == 'ACTIVE' %}
+                        <span class="h-5 inline-flex items-center px-2 rounded text-[10px] font-bold uppercase tracking-wide bg-[#EFF6FF] text-[#2563EB] border border-[#BFDBFE]">
+                            Return Pass
+                        </span>
+                        {% endif %}
+                    {% endif %}
+                </div>
+
+                {% if pass_reservation and qr_code_base64 %}
+                <div class="flex flex-col items-center">
+                    <div class="bg-white border border-slate-200 rounded-xl p-3 mb-4 shadow-sm hover:shadow-md transition-shadow">
+                        <img src="data:image/png;base64,{{ qr_code_base64 }}" alt="Digital Circulation Pass" class="w-40 h-40 object-contain">
+                    </div>
+                    <div class="text-center w-full">
+                        <div class="text-xs font-mono font-bold text-slate-900 mb-0.5">#RES-{{ pass_reservation.id }}</div>
+                        <div class="text-sm font-semibold text-slate-900 mb-1 truncate px-2" title="{{ pass_reservation.item.name }}">{{ pass_reservation.item.name }}</div>
+                        <div class="text-[11px] text-slate-500 mb-3">
+                            Valid: {{ pass_reservation.start_time|date:"M d, H:i" }} &ndash; {{ pass_reservation.end_time|date:"M d, H:i" }}
+                        </div>
+                        <p class="text-[10px] text-slate-500 bg-slate-50 border border-slate-100 rounded-lg py-2.5 px-3">
+                            Present this pass to the duty manager at Media Lab Station 01 for checkout or return clearance.
+                        </p>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-8">
+                    <div class="w-10 h-10 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 mx-auto mb-3">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"
+                                d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z">
+                            </path>
+                        </svg>
+                    </div>
+                    <h4 class="text-xs font-semibold text-slate-800 mb-1">No active pass available</h4>
+                    <p class="text-[11px] text-slate-400">Book equipment from the catalog. Upon approval, your verification QR will render here automatically.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+</main>
+{% endblock %}
