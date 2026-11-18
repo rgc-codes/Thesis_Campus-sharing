@@ -38,7 +38,7 @@ python3 -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # 2. Install dependencies & run migrations
-pip install django qrcode pillow
+pip install -r requirements.txt
 python3 manage.py migrate
 
 # 3. Seed demo hardware inventory and pre-configured accounts
@@ -145,11 +145,12 @@ If a user or staff account is later purged, historical audit records remain inta
 | `/logout/` | `POST` | Authenticated | Session invalidation and redirect to login. |
 | `/reserve/<item_id>/` | `GET`, `POST` | Authenticated | Modal booking form. Enforces 14-day limits and interval math. |
 | `/dashboard/` | `GET` | `STUDENT` | Active loan monitor, deadline countdowns, Base64 QR pass. |
+| `/dashboard/reservation/<pk>/cancel/` | `POST` | `STUDENT` | Cancel own pending or approved reservation (`CANCELLED`). |
 | `/management/dashboard/` | `GET` | `MANAGER`, `ADMIN` | Desk console with filter tabs (`all`, `pending`, `active`, `overdue`). |
 | `/management/reservation/<pk>/approve/` | `POST` | `MANAGER`, `ADMIN` | Transition reservation: `PENDING` &rarr; `APPROVED`. |
 | `/management/reservation/<pk>/checkout/` | `POST` | `MANAGER`, `ADMIN` | Transition reservation: `APPROVED` &rarr; `ACTIVE` (Issues gear). |
-| `/management/reservation/<pk>/return/` | `POST` | `MANAGER`, `ADMIN` | Transition reservation: `ACTIVE`/`OVERDUE` &rarr; `RETURNED`. |
-| `/management/reservation/<pk>/reject/` | `POST` | `MANAGER`, `ADMIN` | Rejects booking request and restores inventory capacity. |
+| `/management/reservation/<pk>/return/` | `POST` | `MANAGER`, `ADMIN` | Transition reservation: `ACTIVE`/`OVERDUE` &rarr; `RETURNED` (applies penalty if late). |
+| `/management/reservation/<pk>/reject/` | `POST` | `MANAGER`, `ADMIN` | Transition reservation: `PENDING` &rarr; `REJECTED`. |
 | `/management/circulation-log/` | `GET` | `MANAGER`, `ADMIN` | Audit trail with metric counters and CSV export (`?export=csv`). |
 | `/admin/` | `GET`, `POST` | `ADMIN` (`is_staff`) | Django superuser administration portal. |
 
@@ -201,12 +202,12 @@ python3 manage.py test backend.core
 ```
 
 ```
-Found 46 test(s).
+Found 58 test(s).
 Creating test database for alias 'default'...
 System check identified no issues (0 silenced).
-..............................................
+..........................................................
 ----------------------------------------------------------------------
-Ran 46 tests in 124.817s
+Ran 58 tests in 0.491s
 
 OK
 Destroying test database for alias 'default'...
@@ -218,4 +219,5 @@ Destroying test database for alias 'default'...
 - **Allen's Interval Algebra (14 tests)**: Abutting intervals (permitted), partial overlaps (blocked), complete enclosures (blocked), multi-unit capacity pools, past-time buffers, 14-day bounds.
 - **Circulation Lifecycle (8 tests)**: `PENDING` &rarr; `APPROVED` &rarr; `ACTIVE` &rarr; `RETURNED` state transitions and actor logging.
 - **Pessimistic Concurrency (7 tests)**: Rollback on error, `select_for_update` row lock isolation, IDOR scoping, CSRF verification.
-- **QR Utilities & CSV Export (6 tests)**: Pure-Python Base64 QR encoding, finder pattern matrix generation, RFC 4180 CSV export compliance.
+- **QR Utilities & CSV Export (6 tests)**: Pure-Python Base64 QR encoding, finder pattern matrix generation, RFC 4180 CSV export compliance with formula sanitization.
+- **QA Audit & Regression Suite (12 tests)**: Competing request resolution, non-blocking rejection, overdue inventory consumption, late return penalty generation, student self-cancellation, admin audit immutability, and expired reservation batch command.

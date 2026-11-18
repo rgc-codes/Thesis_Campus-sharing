@@ -18,8 +18,9 @@ class CustomUserAdmin(UserAdmin):
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ('name', 'created_at')
-    search_fields = ('name',)
+    list_display = ('name', 'workflow_type', 'station_location', 'created_at')
+    list_filter = ('workflow_type',)
+    search_fields = ('name', 'station_location')
 
 
 @admin.register(Item)
@@ -47,3 +48,13 @@ class CirculationLogAdmin(admin.ModelAdmin):
     list_display = ('action_type', 'reservation', 'actor', 'timestamp')
     list_filter = ('action_type', 'timestamp')
     search_fields = ('reservation__item__name', 'actor__username', 'reservation__user__username')
+    readonly_fields = ('reservation', 'action_type', 'actor', 'timestamp', 'note')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

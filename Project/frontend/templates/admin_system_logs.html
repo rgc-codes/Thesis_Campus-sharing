@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+
+{% block title %}Backend System Operations Logs - Admin Console{% endblock %}
+
+{% block content %}
+<main class="max-w-[1440px] mx-auto px-6 sm:px-8 py-10">
+
+    <!-- Header Section -->
+    <div class="flex flex-col lg:flex-row justify-between items-start gap-6 mb-8">
+        <div>
+            <div class="inline-flex items-center gap-2 text-[10px] font-bold tracking-widest text-purple-700 uppercase mb-2">
+                <span class="w-2 h-2 rounded-full bg-purple-600"></span>
+                Backend Telemetry &middot; Admin Audit Stream
+            </div>
+            <h1 class="text-3xl font-semibold tracking-tight text-slate-900 mb-2">Backend System Operations Logs</h1>
+            <p class="text-slate-500 text-sm max-w-2xl leading-relaxed">
+                Immutable trace of atomic transactions, Allen's interval collision blocks, SQLite WAL checkpoints, and authentication events.
+            </p>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <a href="?export=csv{% if selected_event %}&event_type={{ selected_event }}{% endif %}{% if selected_severity %}&severity={{ selected_severity }}{% endif %}"
+                class="h-10 inline-flex items-center gap-2 bg-white border border-borderline hover:bg-slate-50 text-slate-700 text-xs font-semibold px-4 rounded-xl shadow-sm transition-colors">
+                <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                Export RFC 4180 CSV
+            </a>
+            <a href="{% url 'admin_system_dashboard' %}"
+                class="h-10 inline-flex items-center gap-2 bg-purple-900 hover:bg-purple-800 text-white text-xs font-semibold px-4 rounded-xl shadow-sm transition-colors">
+                &larr; Back to Telemetry Hub
+            </a>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="bg-white border border-borderline rounded-2xl p-5 shadow-sm mb-8">
+        <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Event Type</label>
+                <select name="event_type" onchange="this.form.submit()"
+                    class="h-10 w-full bg-white border border-borderline rounded-xl px-3 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-600 shadow-sm">
+                    <option value="">All Event Types</option>
+                    {% for key, label in event_types %}
+                    <option value="{{ key }}" {% if selected_event == key %}selected{% endif %}>{{ label }} ({{ key }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Severity</label>
+                <select name="severity" onchange="this.form.submit()"
+                    class="h-10 w-full bg-white border border-borderline rounded-xl px-3 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-600 shadow-sm">
+                    <option value="">All Severities</option>
+                    {% for key, label in severities %}
+                    <option value="{{ key }}" {% if selected_severity == key %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="md:col-span-2">
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Search Keywords / Message</label>
+                <div class="flex gap-2">
+                    <input type="text" name="q" value="{{ request.GET.q|default:'' }}" placeholder="Search in telemetry messages..."
+                        class="h-10 flex-1 bg-white border border-borderline rounded-xl px-3 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-600 shadow-sm">
+                    <button type="submit"
+                        class="h-10 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-medium transition-colors shadow-sm cursor-pointer">
+                        Filter
+                    </button>
+                    {% if selected_event or selected_severity or request.GET.q %}
+                    <a href="{% url 'admin_system_logs' %}"
+                        class="h-10 px-3 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-medium transition-colors">
+                        Clear
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Logs Table -->
+    <div class="bg-white border border-borderline rounded-2xl shadow-sm overflow-hidden mb-8">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs font-mono">
+                <thead>
+                    <tr class="border-b border-slate-100 bg-slate-50/60 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        <th class="py-3.5 px-6">ID</th>
+                        <th class="py-3.5 px-6">Timestamp</th>
+                        <th class="py-3.5 px-6">Event Type</th>
+                        <th class="py-3.5 px-6">Severity</th>
+                        <th class="py-3.5 px-6">Module</th>
+                        <th class="py-3.5 px-6">Latency</th>
+                        <th class="py-3.5 px-6">Message &amp; Metadata</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for item in logs %}
+                    <tr class="hover:bg-slate-50/80 transition-colors">
+                        <td class="py-3.5 px-6 text-slate-400">#{{ item.id }}</td>
+                        <td class="py-3.5 px-6 text-slate-600">{{ item.timestamp|date:"Y-m-d H:i:s" }}</td>
+                        <td class="py-3.5 px-6 font-bold text-slate-800">{{ item.event_type }}</td>
+                        <td class="py-3.5 px-6">
+                            <span class="px-2 py-0.5 rounded text-[9px] font-bold uppercase
+                                {% if item.severity == 'CRITICAL' %}bg-rose-100 text-rose-800
+                                {% elif item.severity == 'WARNING' %}bg-amber-100 text-amber-800
+                                {% else %}bg-purple-100 text-purple-800{% endif %}">
+                                {{ item.severity }}
+                            </span>
+                        </td>
+                        <td class="py-3.5 px-6 text-slate-500 text-[11px]">{{ item.module }}</td>
+                        <td class="py-3.5 px-6 text-slate-600 font-mono">
+                            {% if item.execution_time_ms %}{{ item.execution_time_ms|floatformat:2 }}ms{% else %}&mdash;{% endif %}
+                        </td>
+                        <td class="py-3.5 px-6 font-sans">
+                            <div class="text-xs font-medium text-slate-900 leading-snug">{{ item.message }}</div>
+                            {% if item.metadata %}
+                            <div class="text-[10px] font-mono text-slate-400 mt-0.5 leading-tight">{{ item.metadata }}</div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="py-12 text-center text-xs text-slate-400 font-sans">
+                            No system operations logs found matching the filter criteria.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between text-xs">
+            <span class="text-slate-500 font-sans">
+                Showing page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} ({{ total_count }} entries)
+            </span>
+            <div class="flex gap-2">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% if selected_event %}&event_type={{ selected_event }}{% endif %}{% if selected_severity %}&severity={{ selected_severity }}{% endif %}"
+                    class="px-3 py-1.5 bg-white border border-borderline rounded-lg font-medium text-slate-700 hover:bg-slate-50">
+                    &larr; Previous
+                </a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if selected_event %}&event_type={{ selected_event }}{% endif %}{% if selected_severity %}&severity={{ selected_severity }}{% endif %}"
+                    class="px-3 py-1.5 bg-white border border-borderline rounded-lg font-medium text-slate-700 hover:bg-slate-50">
+                    Next &rarr;
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+</main>
+{% endblock %}

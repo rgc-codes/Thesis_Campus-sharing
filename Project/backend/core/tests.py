@@ -793,3 +793,393 @@ class CirculationWorkflowTests(ModelSetupMixin, TestCase):
         self.assertIn('Log ID,Timestamp,Action Type,Item Name,Category,Student,Student ID,Lab Officer,Notes', content)
         self.assertIn('Test approval log', content)
 
+
+# ==========================================================================
+# TEST 9: QA Bug Fix Verification Suite
+# ==========================================================================
+class QABugFixVerificationTests(ModelSetupMixin, TestCase):
+    """Verifies all fixes for bugs identified in the QA audit report."""
+
+    def setUp(self):
+        super().setUp()
+        self.client = Client()
+        self.now = timezone.now()
+
+    def test_reject_sets_rejected_status_and_logs(self):
+        """Bug 4.6 fix: Rejection sets REJECTED status (not RETURNED)."""
+        res = Reservation.objects.create(
+            user=self.student_user,
+            item=self.item,
+            quantity=1,
+            start_time=self.now + timedelta(hours=1),
+            end_time=self.now + timedelta(hours=3),
+            status=Reservation.Status.PENDING,
+        )
+        self.client.login(username='manager_user', password='testpass123')
+        response = self.client.post(reverse('reject_reservation', args=[res.pk]))
+        self.assertEqual(response.status_code, 302)
+        res.refresh_from_db()
+        self.assertEqual(res.status, Reservation.Status.REJECTED)
+        self.assertTrue(
+            CirculationLog.objects.filter(
+                reservation=res,
+                action_type=CirculationLog.Action.REJECTED,
+            ).exists()
+        )
+
+    def test_reject_contested_reservation_does_not_500(self):
+        """Bug 3.1 fix: Contested pending reservation can be rejected without 500."""
+        # Item capacity is 3. Res1 takes 3 (all capacity).
+        res1 = Reservation.objects.create(
+            user=self.student_user,
+            item=self.item,
+            quantity=3,
+            start_time=self.now + timedelta(hours=2),
+            end_time=self.now + timedelta(hours=5),
+            status=Reservation.Status.APPROVED,
+        )
+        # Res2 is a competing request created before approval
+        res2 = Reservation(
+            user=self.admin_user,
+            item=self.item,
+            quantity=1,
+            start_time=self.now + timedelta(hours=2),
+            end_time=self.now + timedelta(hours=5),
+            status=Reservation.Status.PENDING,
+        )
+        super(Reservation, res2).save()
+
+        self.client.login(username='manager_user', password='testpass123')
+        response = self.client.post(reverse('reject_reservation', args=[res2.pk]))
+        self.assertEqual(response.status_code, 302)
+        res2.refresh_from_db()
+        self.assertEqual(res2.status, Reservation.Status.REJECTED)
+
+    def test_approve_over_capacity_handled_gracefully(self):
+        """Bug 3.1 fix: Approving over capacity redirects with error, not 500."""
+        res1 = Reservation.objects.create(
+            user=self.student_user,
+            item=self.item,
+            quantity=3,
+            start_time=self.now + timedelta(hours=2),
+            end_time=self.now + timedelta(hours=5),
+            status=Reservation.Status.APPROVED,
+        )
+        res2 = Reservation(
+            user=self.admin_user,
+            item=self.item,
+            quantity=1,
+            start_time=self.now + timedelta(hours=2),
+            end_time=self.now + timedelta(hours=5),
+            status=Reservation.Status.PENDING,
+        )
+        super(Reservation, res2).save()
+
+        self.client.login(username='manager_user', password='testpass123')
+        response = self.client.post(reverse('approve_reservation', args=[res2.pk]))
+        self.assertEqual(response.status_code, 302)
+        res2.refresh_from_db()
+        self.assertEqual(res2.status, Reservation.Status.PENDING)
+
+    def test_student_can_cancel_own_reservation(self):
+        """Bug 4.8 fix: Students can cancel their own PENDING or APPROVED reservation."""
+        res = Reservation.objects.create(
+            user=self.student_user,
+            item=self.item,
+            quantity=1,
+            start_time=self.now + timedelta(hours=1),
+            end_time=self.now + timedelta(hours=3),
+            status=Reservation.Status.PENDING,
+        )
+        self.client.login(username='student_user', password='testpass123')
+        response = self.client.post(reverse('cancel_reservation', args=[res.pk]))
+        self.assertEqual(response.status_code, 302)
+        res.refresh_from_db()
+        self.assertEqual(res.status, Reservation.Status.CANCELLED)
+
+    def test_student_cannot_cancel_others_reservation(self):
+        """Bug 4.8 fix: Student cannot cancel another student's reservation (404)."""
+        other_user = CustomUser.objects.create_user(
+            username='other_student',
+            password='testpass123',
+            role=CustomUser.Role.STUDENT,
+        )
+        res = Reservation.objects.create(
+            user=other_user,
+            item=self.item,
+            quantity=1,
+            start_time=self.now + timedelta(hours=1),
+            end_time=self.now + timedelta(hours=3),
+            status=Reservation.Status.PENDING,
+        )
+        self.client.login(username='student_user', password='testpass123')
+        response = self.client.post(reverse('cancel_reservation', args=[res.pk]))
+        self.assertEqual(response.status_code, 404)
+        res.refresh_from_db()
+        self.assertEqual(res.status, Reservation.Status.PENDING)
+
+    def test_catalog_invalid_category_param(self):
+        """Bug 4.2 fix: GET /?category=abc must return 200 without crashing."""
+        self.client.login(username='student_user', password='testpass123')
+        response = self.client.get(reverse('catalog') + '?category=abc')
+        self.assertEqual(response.status_code, 200)
+
+    def test_overdue_reservation_consumes_inventory(self):
+        """Bug 3.3 fix: OVERDUE reservations count against available capacity."""
+        res_overdue = Reservation(
+            user=self.student_user,
+            item=self.item,
+            quantity=2,  # uses full capacity
+            start_time=self.now - timedelta(hours=10),
+            end_time=self.now - timedelta(hours=2),
+            status=Reservation.Status.OVERDUE,
+        )
+        super(Reservation, res_overdue).save()
+
+        # Attempting to book overlapping interval should fail validation
+        res_new = Reservation(
+            user=self.admin_user,
+            item=self.item,
+            quantity=1,
+            start_time=self.now - timedelta(hours=5),
+            end_time=self.now + timedelta(hours=2),
+            status=Reservation.Status.PENDING,
+        )
+        with self.assertRaises(ValidationError):
+            res_new.clean()
+
+    def test_late_return_creates_penalty_record(self):
+        """Bug 3.2 fix: Late return automatically creates a PenaltyRecord."""
+        res_late = Reservation(
+            user=self.student_user,
+            item=self.item,
+            quantity=1,
+            start_time=self.now - timedelta(hours=10),
+            end_time=self.now - timedelta(hours=4),
+            status=Reservation.Status.ACTIVE,
+        )
+        super(Reservation, res_late).save()
+
+        self.client.login(username='manager_user', password='testpass123')
+        response = self.client.post(reverse('return_item', args=[res_late.pk]))
+        self.assertEqual(response.status_code, 302)
+        res_late.refresh_from_db()
+        self.assertEqual(res_late.status, Reservation.Status.RETURNED)
+        self.assertTrue(PenaltyRecord.objects.filter(reservation=res_late).exists())
+        penalty = PenaltyRecord.objects.get(reservation=res_late)
+        self.assertGreater(penalty.amount, 0)
+
+    def test_csv_export_formula_injection_sanitization(self):
+        """Bug 4.4 fix: CSV cell values starting with =, +, -, @ are escaped with '."""
+        res = Reservation.objects.create(
+            user=self.student_user,
+            item=self.item,
+            quantity=1,
+            start_time=self.now + timedelta(hours=1),
+            end_time=self.now + timedelta(hours=3),
+            status=Reservation.Status.APPROVED,
+        )
+        CirculationLog.objects.create(
+            reservation=res,
+            actor=self.manager_user,
+            action_type=CirculationLog.Action.APPROVED,
+            note='=SUM(1+1)',
+        )
+        self.client.login(username='manager_user', password='testpass123')
+        csv_response = self.client.get(reverse('circulation_log') + '?export=csv')
+        self.assertEqual(csv_response.status_code, 200)
+        content = csv_response.content.decode('utf-8')
+        self.assertIn("'=SUM(1+1)", content)
+
+    def test_circulation_log_admin_read_only(self):
+        """Bug 6.x fix: CirculationLog is append-only / read-only in Django admin."""
+        from django.contrib.admin.sites import AdminSite
+        from backend.core.admin import CirculationLogAdmin
+        admin_site = AdminSite()
+        log_admin = CirculationLogAdmin(CirculationLog, admin_site)
+
+        from django.test import RequestFactory
+        factory = RequestFactory()
+        req = factory.get('/admin/')
+        req.user = self.admin_user
+
+        self.assertFalse(log_admin.has_add_permission(req))
+        self.assertFalse(log_admin.has_change_permission(req))
+        self.assertFalse(log_admin.has_delete_permission(req))
+
+    def test_mark_overdue_command(self):
+        """Bug 3.2 fix: mark_overdue management command transitions expired ACTIVE reservations."""
+        from django.core.management import call_command
+        res_active_expired = Reservation(
+            user=self.student_user,
+            item=self.item,
+            quantity=1,
+            start_time=self.now - timedelta(hours=8),
+            end_time=self.now - timedelta(hours=2),
+            status=Reservation.Status.ACTIVE,
+        )
+        super(Reservation, res_active_expired).save()
+
+        call_command('mark_overdue')
+        res_active_expired.refresh_from_db()
+        self.assertEqual(res_active_expired.status, Reservation.Status.OVERDUE)
+
+    def test_manager_without_is_staff_can_access_dashboard(self):
+        """Bug 4.3 fix: Manager does not require is_staff=True to access management dashboard."""
+        mgr_no_staff = CustomUser.objects.create_user(
+            username='mgr_pure',
+            password='testpass123',
+            role=CustomUser.Role.MANAGER,
+            is_staff=False,
+        )
+        self.client.login(username='mgr_pure', password='testpass123')
+        response = self.client.get(reverse('admin_dashboard'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_reserve_multi_quantity_and_purpose(self):
+        """FE-01 & FE-03: Multi-unit reservation with purpose and notes persists."""
+        self.client.login(username='student_user', password='testpass123')
+        post_data = {
+            'start_time': (self.now + timedelta(days=2)).strftime('%Y-%m-%dT%H:%M'),
+            'end_time': (self.now + timedelta(days=4)).strftime('%Y-%m-%dT%H:%M'),
+            'quantity': 2,
+            'purpose': 'research',
+            'notes': 'Optics experiment for laboratory',
+        }
+        response = self.client.post(reverse('reserve_item', args=[self.item.id]), post_data)
+        self.assertEqual(response.status_code, 302)
+        res = Reservation.objects.get(user=self.student_user, notes='Optics experiment for laboratory')
+        self.assertEqual(res.quantity, 2)
+        self.assertEqual(res.purpose, 'research')
+
+    def test_reserve_lead_time_60_days_enforced(self):
+        """FE-02: Lead time greater than 60 days is rejected by validation."""
+        res = Reservation(
+            user=self.student_user,
+            item=self.item,
+            quantity=1,
+            start_time=self.now + timedelta(days=65),
+            end_time=self.now + timedelta(days=68),
+            status=Reservation.Status.PENDING,
+        )
+        with self.assertRaises(ValidationError):
+            res.clean()
+
+    def test_signed_qr_pass_generation_and_tamper_detection(self):
+        """FE-05: Cryptographic HMAC signature generation and tamper verification."""
+        res = Reservation.objects.create(
+            user=self.student_user,
+            item=self.item,
+            quantity=1,
+            start_time=self.now + timedelta(hours=1),
+            end_time=self.now + timedelta(hours=48),
+            status=Reservation.Status.APPROVED,
+        )
+        token = res.generate_signed_pass_token()
+        self.assertIsInstance(token, str)
+
+        # Verification succeeds on untampered token
+        data = Reservation.verify_signed_pass_token(token)
+        self.assertTrue(data['valid'])
+        self.assertEqual(data['reservation_id'], res.id)
+        self.assertFalse(data['expired'])
+
+        # Tampered token fails verification
+        tampered_token = token[:-4] + 'xxxx'
+        tampered_result = Reservation.verify_signed_pass_token(tampered_token)
+        self.assertFalse(tampered_result['valid'])
+
+    def test_rejection_reason_persisted_and_logged(self):
+        """FE-08: Rejection captures reason in cancellation_reason and CirculationLog."""
+        res = Reservation.objects.create(
+            user=self.student_user,
+            item=self.item,
+            quantity=1,
+            start_time=self.now + timedelta(hours=2),
+            end_time=self.now + timedelta(hours=6),
+            status=Reservation.Status.PENDING,
+        )
+        self.client.login(username='manager_user', password='testpass123')
+        response = self.client.post(
+            reverse('reject_reservation', args=[res.pk]),
+            {'reason': 'Studio maintenance scheduled'},
+        )
+        self.assertEqual(response.status_code, 302)
+        res.refresh_from_db()
+        self.assertEqual(res.status, Reservation.Status.REJECTED)
+        self.assertEqual(res.cancellation_reason, 'Studio maintenance scheduled')
+
+        log = CirculationLog.objects.get(reservation=res, action_type=CirculationLog.Action.REJECTED)
+        self.assertIn('Studio maintenance scheduled', log.note)
+
+    def test_student_dashboard_partitions_past_reservations(self):
+        """FE-06: Student dashboard includes past/archived requests."""
+        res = Reservation(
+            user=self.student_user,
+            item=self.item,
+            quantity=1,
+            start_time=self.now - timedelta(days=2),
+            end_time=self.now - timedelta(days=1),
+            status=Reservation.Status.RETURNED,
+        )
+        super(Reservation, res).save()
+        self.client.login(username='student_user', password='testpass123')
+        response = self.client.get(reverse('student_dashboard'))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('past_reservations', response.context)
+        self.assertTrue(any(r.id == res.id for r in response.context['past_reservations']))
+
+    def test_category_separated_workflow_filtering(self):
+        """Manager console partitions workflows by category."""
+        cat2 = Category.objects.create(
+            name='Audio Booth',
+            workflow_type=Category.WorkflowType.AUDIO,
+            station_location='Station 02 · Sound Booth',
+            inspection_checklist='Diaphragm check\nCable check',
+        )
+        item2 = Item.objects.create(
+            category=cat2,
+            name='Field Recorder',
+            total_quantity=2,
+            is_active=True,
+        )
+        res_cat2 = Reservation.objects.create(
+            user=self.student_user,
+            item=item2,
+            quantity=1,
+            start_time=self.now + timedelta(hours=2),
+            end_time=self.now + timedelta(hours=5),
+            status=Reservation.Status.PENDING,
+        )
+
+        self.client.login(username='manager_user', password='testpass123')
+        # Filter for cat2 workflow
+        response = self.client.get(reverse('admin_dashboard') + f'?category={cat2.id}')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['active_category'], cat2)
+        self.assertIn('Diaphragm check', response.context['checklist_items'])
+        # The reservation list should contain res_cat2
+        res_ids = [r.id for r in response.context['reservations']]
+        self.assertIn(res_cat2.id, res_ids)
+
+    def test_notification_actionable_links_generated(self):
+        """Notification system produces actionable direct links for users."""
+        res_approved = Reservation.objects.create(
+            user=self.student_user,
+            item=self.item,
+            quantity=1,
+            start_time=self.now + timedelta(hours=2),
+            end_time=self.now + timedelta(hours=5),
+            status=Reservation.Status.APPROVED,
+        )
+        self.client.login(username='student_user', password='testpass123')
+        response = self.client.get(reverse('catalog'))
+        self.assertIn('user_notifications', response.context)
+        notifications = response.context['user_notifications']
+        self.assertTrue(len(notifications) > 0)
+        # Check that links are valid and lead to dashboard
+        for notif in notifications:
+            self.assertTrue(notif['link'].startswith('/'))
+
+
+

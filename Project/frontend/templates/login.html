@@ -61,30 +61,52 @@
             </form>
 
             <!-- Quick Demo Credentials -->
+            {% if DEMO_MODE %}
             <div class="mt-7 pt-5 border-t border-borderline">
-                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-center mb-3">Quick Credentials (Click to prefill)</div>
-                <div class="grid grid-cols-2 gap-2.5">
-                    <button type="button" onclick="fillCredentials('student1', 'pass123')"
-                        class="text-left bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-xl p-3 transition-colors cursor-pointer">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-center mb-3">Quick Credentials (Verified Users)</div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button type="button" onclick="fillCredentials('Jannat', 'pass123')"
+                        class="text-left bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-xl p-2.5 transition-colors cursor-pointer">
                         <div class="flex items-center justify-between mb-1">
-                            <span class="text-xs font-semibold text-slate-800">Student</span>
+                            <span class="text-xs font-semibold text-slate-800">Jannat</span>
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                         </div>
-                        <div class="text-[10px] text-slate-500 font-mono">student1</div>
+                        <div class="text-[10px] text-slate-500 font-mono">Student</div>
                         <div class="text-[10px] text-slate-400 font-mono">pass123</div>
                     </button>
 
-                    <button type="button" onclick="fillCredentials('manager1', 'pass123')"
-                        class="text-left bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-xl p-3 transition-colors cursor-pointer">
+                    <button type="button" onclick="fillCredentials('Sazzad', 'pass123')"
+                        class="text-left bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-xl p-2.5 transition-colors cursor-pointer">
                         <div class="flex items-center justify-between mb-1">
-                            <span class="text-xs font-semibold text-slate-800">Manager</span>
+                            <span class="text-xs font-semibold text-slate-800">Sazzad</span>
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        </div>
+                        <div class="text-[10px] text-slate-500 font-mono">Student</div>
+                        <div class="text-[10px] text-slate-400 font-mono">pass123</div>
+                    </button>
+
+                    <button type="button" onclick="fillCredentials('Max', 'pass123')"
+                        class="text-left bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-xl p-2.5 transition-colors cursor-pointer">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs font-semibold text-slate-800">Max</span>
                             <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
                         </div>
-                        <div class="text-[10px] text-slate-500 font-mono">manager1</div>
+                        <div class="text-[10px] text-slate-500 font-mono">Manager</div>
                         <div class="text-[10px] text-slate-400 font-mono">pass123</div>
+                    </button>
+
+                    <button type="button" onclick="fillCredentials('aether', 'pass123')"
+                        class="text-left bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl p-2.5 transition-colors cursor-pointer">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs font-semibold text-purple-900">aether</span>
+                            <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                        </div>
+                        <div class="text-[10px] text-purple-600 font-mono">Admin</div>
+                        <div class="text-[10px] text-purple-400 font-mono">pass123</div>
                     </button>
                 </div>
             </div>
+            {% endif %}
 
         </div>
 

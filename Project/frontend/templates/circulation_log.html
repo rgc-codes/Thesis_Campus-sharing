@@ -214,6 +214,32 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Table Footer / Count & Pagination -->
+        <div class="bg-slate-50/50 border-t border-borderline px-5 py-3 flex items-center justify-between text-xs text-slate-500">
+            <div>
+                Showing <strong class="text-slate-900">{{ logs|length }}</strong> of <strong class="text-slate-900">{{ total_logs_count }}</strong> event(s)
+            </div>
+            {% if page_obj.has_other_pages %}
+            <div class="flex items-center gap-1.5">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}"
+                    class="h-7 px-2.5 rounded-md bg-white border border-borderline text-slate-700 hover:bg-slate-100 flex items-center text-xs font-medium transition-colors">
+                    &larr; Prev
+                </a>
+                {% endif %}
+                <span class="px-2 text-slate-500 text-xs">
+                    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                </span>
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}"
+                    class="h-7 px-2.5 rounded-md bg-white border border-borderline text-slate-700 hover:bg-slate-100 flex items-center text-xs font-medium transition-colors">
+                    Next &rarr;
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
     </div>
 
 </main>

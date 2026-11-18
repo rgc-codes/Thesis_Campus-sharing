@@ -99,7 +99,7 @@
     <header class="bg-canvas border-b border-borderline px-6 sm:px-8 py-3.5 flex items-center justify-between sticky top-0 z-40">
         <!-- Left: Brand -->
         <div class="flex items-center gap-4">
-            <a href="{% url 'catalog' %}" class="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
+            <a href="{% if user.is_authenticated %}{% if user.role == 'ADMIN' %}{% url 'admin_system_dashboard' %}{% elif user.role == 'MANAGER' %}{% url 'manager_dashboard' %}{% else %}{% url 'catalog' %}{% endif %}{% else %}{% url 'catalog' %}{% endif %}" class="flex items-center gap-2.5 hover:opacity-90 transition-opacity">
                 <div class="w-7 h-7 bg-emerald-500 rounded-lg flex items-center justify-center shrink-0 shadow-sm">
                     <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -110,37 +110,75 @@
                 <span class="font-semibold text-slate-900 tracking-tight text-sm">Campus Equipment</span>
             </a>
             <div class="h-4 w-px bg-slate-200 hidden sm:block"></div>
-            <span class="text-xs font-medium text-slate-500 tracking-tight hidden sm:inline">Equipment Circulation</span>
+            <span class="text-xs font-medium text-slate-500 tracking-tight hidden sm:inline">
+                {% if user.is_authenticated %}
+                    {% if user.role == 'ADMIN' %}Backend System Console{% elif user.role == 'MANAGER' %}Lab Manager Desk{% else %}Student Equipment Circulation{% endif %}
+                {% else %}
+                    Equipment Circulation
+                {% endif %}
+            </span>
         </div>
 
-        <!-- Center: Navigation -->
+        <!-- Center: Navigation strictly partitioned by Role -->
         <nav class="hidden md:flex items-center gap-1.5">
+            {% if not user.is_authenticated or user.role == 'STUDENT' %}
             <a href="{% url 'catalog' %}"
                 class="h-9 inline-flex items-center px-3.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors gap-1.5">
                 <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
                 </svg>
-                Catalog
+                Equipment Catalog
             </a>
             {% if user.is_authenticated %}
-                {% if user.role == 'STUDENT' %}
-                <a href="{% url 'student_dashboard' %}"
-                    class="h-9 inline-flex items-center px-3.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors gap-1.5">
-                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                    </svg>
-                    My Loans
-                </a>
-                {% endif %}
-                {% if user.role in 'ADMIN MANAGER' or user.is_staff %}
-                <a href="{% url 'admin_dashboard' %}"
-                    class="h-9 inline-flex items-center px-3.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors gap-1.5">
-                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path>
-                    </svg>
-                    Manager Console
-                </a>
-                {% endif %}
+            <a href="{% url 'student_dashboard' %}"
+                class="h-9 inline-flex items-center px-3.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors gap-1.5">
+                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                </svg>
+                My Loans &amp; QR Pass
+            </a>
+            {% endif %}
+            {% endif %}
+
+            {% if user.is_authenticated and user.role == 'MANAGER' %}
+            <a href="{% url 'manager_dashboard' %}"
+                class="h-9 inline-flex items-center px-3.5 rounded-lg text-xs font-medium text-slate-900 bg-slate-100 transition-colors gap-1.5 font-semibold">
+                <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path>
+                </svg>
+                Manager Hub
+            </a>
+            <a href="{% url 'circulation_log' %}"
+                class="h-9 inline-flex items-center px-3.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors gap-1.5">
+                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                Circulation Logs
+            </a>
+            {% endif %}
+
+            {% if user.is_authenticated and user.role == 'ADMIN' %}
+            <a href="{% url 'admin_system_dashboard' %}"
+                class="h-9 inline-flex items-center px-3.5 rounded-lg text-xs font-medium text-purple-900 bg-purple-50 border border-purple-200 transition-colors gap-1.5 font-semibold">
+                <svg class="w-3.5 h-3.5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                </svg>
+                System Information &amp; Architecture
+            </a>
+            <a href="{% url 'admin_system_logs' %}"
+                class="h-9 inline-flex items-center px-3.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors gap-1.5">
+                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7C5 4 4 5 4 7z"></path>
+                </svg>
+                Backend Logs
+            </a>
+            <a href="{% url 'manager_dashboard' %}"
+                class="h-9 inline-flex items-center px-3.5 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors gap-1.5">
+                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path>
+                </svg>
+                Circulation Desk
+            </a>
             {% endif %}
         </nav>
 
@@ -158,10 +196,12 @@
                             d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9">
                         </path>
                     </svg>
-                    <!-- Unread Badge Counter Pill -->
+                    {% if unread_notifications_count > 0 %}
+                    <!-- Dynamic Unread Badge -->
                     <span id="notif-badge" class="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-emerald-500 text-white text-[10px] font-bold rounded-full px-1 flex items-center justify-center shadow-sm">
-                        3
+                        {{ unread_notifications_count }}
                     </span>
+                    {% endif %}
                 </button>
 
                 <!-- Notification Dropdown Panel -->
@@ -180,54 +220,41 @@
 
                     <!-- Notification Items List -->
                     <div class="divide-y divide-slate-100 max-h-80 overflow-y-auto" id="notif-list">
-                        <!-- Notification 1 -->
-                        <div class="p-4 hover:bg-slate-50/75 transition-colors cursor-pointer notif-item flex items-start gap-3">
-                            <div class="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                                </svg>
-                            </div>
-                            <div class="min-w-0 flex-1">
-                                <div class="text-xs font-semibold text-slate-900">Sony FX3 Reservation Approved!</div>
-                                <div class="text-xs text-slate-500 mt-0.5 leading-snug">Present your digital QR pass at Station 01 for checkout clearance.</div>
-                                <div class="text-[10px] font-medium text-slate-400 mt-1 flex items-center gap-1">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> 2 minutes ago
+                        {% for notif in user_notifications %}
+                        <a href="{{ notif.link }}" class="p-3.5 hover:bg-slate-50 transition-colors block notif-item">
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 rounded-xl {% if notif.tag == 'error' %}bg-rose-50 text-rose-600 border border-rose-100{% elif notif.tag == 'warning' %}bg-amber-50 text-amber-600 border border-amber-100{% else %}bg-emerald-50 text-emerald-600 border border-emerald-100{% endif %} flex items-center justify-center shrink-0 mt-0.5">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center justify-between gap-1.5 mb-0.5">
+                                        <span class="text-xs font-semibold text-slate-900 truncate">{{ notif.title }}</span>
+                                        {% if notif.badge %}
+                                        <span class="text-[9px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider {% if notif.tag == 'error' %}bg-rose-100 text-rose-700{% elif notif.tag == 'warning' %}bg-amber-100 text-amber-700{% else %}bg-emerald-100 text-emerald-700{% endif %} shrink-0">
+                                            {{ notif.badge }}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-[11px] text-slate-500 leading-snug line-clamp-2">{{ notif.body }}</div>
+                                    <div class="text-[10px] font-medium text-slate-400 mt-1 flex items-center gap-1">
+                                        <span class="w-1.5 h-1.5 rounded-full {% if notif.tag == 'error' %}bg-rose-500{% elif notif.tag == 'warning' %}bg-amber-500{% else %}bg-emerald-500{% endif %}"></span>
+                                        {{ notif.time|timesince }} ago &middot; <span class="text-emerald-600 font-semibold hover:underline">Open screen &rarr;</span>
+                                    </div>
                                 </div>
                             </div>
+                        </a>
+                        {% empty %}
+                        <div class="p-8 text-center text-xs text-slate-400">
+                            No unread notifications at this time. All systems clear.
                         </div>
-
-                        <!-- Notification 2 -->
-                        <div class="p-4 hover:bg-slate-50/75 transition-colors cursor-pointer notif-item flex items-start gap-3">
-                            <div class="w-8 h-8 rounded-xl bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                            </div>
-                            <div class="min-w-0 flex-1">
-                                <div class="text-xs font-semibold text-slate-900">Return Deadline Reminder</div>
-                                <div class="text-xs text-slate-500 mt-0.5 leading-snug">Canon EOS R5 borrowing period concludes in 24 hours.</div>
-                                <div class="text-[10px] font-medium text-slate-400 mt-1">1 hour ago</div>
-                            </div>
-                        </div>
-
-                        <!-- Notification 3 -->
-                        <div class="p-4 hover:bg-slate-50/75 transition-colors cursor-pointer notif-item flex items-start gap-3">
-                            <div class="w-8 h-8 rounded-xl bg-purple-50 border border-purple-100 text-purple-600 flex items-center justify-center shrink-0 mt-0.5">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-                                </svg>
-                            </div>
-                            <div class="min-w-0 flex-1">
-                                <div class="text-xs font-semibold text-slate-900">Trust Standing Verified</div>
-                                <div class="text-xs text-slate-500 mt-0.5 leading-snug">Score maintained at 98/100 (Tier 1 Priority Borrowing active).</div>
-                                <div class="text-[10px] font-medium text-slate-400 mt-1">Yesterday</div>
-                            </div>
-                        </div>
+                        {% endfor %}
                     </div>
 
                     <!-- Dropdown Footer -->
-                    <div class="p-3 border-t border-borderline bg-slate-50/50 text-center">
-                        <a href="{% if user.role == 'STUDENT' %}{% url 'student_dashboard' %}{% else %}{% url 'admin_dashboard' %}{% endif %}"
+                    <div class="p-2.5 border-t border-borderline bg-slate-50/50 text-center">
+                        <a href="{% if user.role == 'STUDENT' %}{% url 'student_dashboard' %}{% elif user.role == 'MANAGER' %}{% url 'manager_dashboard' %}{% else %}{% url 'admin_system_dashboard' %}{% endif %}"
                             class="text-xs font-semibold text-slate-700 hover:text-slate-900 transition-colors inline-flex items-center gap-1">
                             Go to active dashboard
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

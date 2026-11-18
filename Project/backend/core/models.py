@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
+from django.core.signing import Signer, BadSignature
 from django.db import models
 from django.db.models import Sum
 from django.utils import timezone
@@ -31,8 +32,24 @@ class CustomUser(AbstractUser):
 
 
 class Category(models.Model):
+    class WorkflowType(models.TextChoices):
+        STUDIO = 'STUDIO', _('Media & Studio Inspection Workflow')
+        AUDIO = 'AUDIO', _('Audio Field Gear Protocol')
+        LAB = 'LAB', _('Precision Lab & Calibration Workflow')
+        COMPUTING = 'COMPUTING', _('Spatial VR & Mobile Computing Protocol')
+
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
+    workflow_type = models.CharField(
+        max_length=20,
+        choices=WorkflowType.choices,
+        default=WorkflowType.STUDIO,
+    )
+    station_location = models.CharField(max_length=100, default='Media Lab Station 01')
+    inspection_checklist = models.TextField(
+        blank=True,
+        default='1. Optical casing integrity\n2. Power & sensor cycle test\n3. Accessories & cabling audit'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -64,6 +81,13 @@ class Reservation(models.Model):
         ACTIVE = 'ACTIVE', _('Active')
         RETURNED = 'RETURNED', _('Returned')
         OVERDUE = 'OVERDUE', _('Overdue')
+        REJECTED = 'REJECTED', _('Rejected')
+        CANCELLED = 'CANCELLED', _('Cancelled')
+
+    class Purpose(models.TextChoices):
+        COURSEWORK = 'coursework', _('Academic Coursework')
+        RESEARCH = 'research', _('Faculty Research')
+        CLUB = 'club', _('Student Club Project')
 
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='reservations')
     item = models.ForeignKey(Item, on_delete=models.PROTECT, related_name='reservations')
@@ -76,6 +100,13 @@ class Reservation(models.Model):
         default=Status.PENDING,
         db_index=True,
     )
+    purpose = models.CharField(
+        max_length=32,
+        choices=Purpose.choices,
+        default=Purpose.COURSEWORK,
+    )
+    notes = models.TextField(blank=True, default='')
+    cancellation_reason = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -98,6 +129,10 @@ class Reservation(models.Model):
         if self._state.adding and self.start_time < (timezone.now() - timedelta(minutes=5)):
             raise ValidationError({"start_time": _("Reservation start time cannot be in the past.")})
 
+        # Cap booking lead time to 60 days
+        if self._state.adding and self.start_time > (timezone.now() + timedelta(days=60)):
+            raise ValidationError({"start_time": _("Reservations cannot be booked more than 60 days in advance.")})
+
         # Max continuous borrowing duration: 14 days
         if (self.end_time - self.start_time).total_seconds() > 14 * 86400:
             raise ValidationError({"end_time": _("Reservation duration cannot exceed 14 consecutive days.")})
@@ -108,12 +143,25 @@ class Reservation(models.Model):
         if self.quantity > self.item.total_quantity:
             raise ValidationError({"quantity": _("Requested quantity exceeds total item inventory.")})
 
-        # Conflict prevention: overlapping intervals [s1, e1) and [s2, e2) intersect iff s1 < e2 and e1 > s2
+        # Conflict check applies to capacity-holding statuses:
+        # PENDING requests reserve capacity immediately to prevent double-booking.
+        # APPROVED, ACTIVE, and OVERDUE also consume physical inventory.
+        if self.status not in (
+            self.Status.PENDING, self.Status.APPROVED, self.Status.ACTIVE,
+        ):
+            return
+
+        # Conflict prevention: overlapping intervals [s1, e1) and [s2, e2) intersect
+        # iff s1 < e2 and s2 < e1 (Allen's Interval Algebra).
         overlapping_reservations = Reservation.objects.filter(
             item=self.item,
             start_time__lt=self.end_time,
             end_time__gt=self.start_time,
-            status__in=[self.Status.APPROVED, self.Status.ACTIVE],
+            status__in=[
+                self.Status.APPROVED,
+                self.Status.ACTIVE,
+                self.Status.OVERDUE,
+            ],
         )
 
         if self.pk:
@@ -134,6 +182,29 @@ class Reservation(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
+
+    def generate_signed_pass_token(self) -> str:
+        """Cryptographically signed HMAC token for QR pass verification."""
+        signer = Signer(sep=':')
+        payload = f"{self.id}:{self.user_id}:{self.item_id}:{self.status}:{int(self.end_time.timestamp())}"
+        return signer.sign(payload)
+
+    @classmethod
+    def verify_signed_pass_token(cls, token: str) -> dict:
+        signer = Signer(sep=':')
+        try:
+            original = signer.unsign(token)
+            res_id, user_id, item_id, status, expiry = original.split(':')
+            return {
+                "valid": True,
+                "reservation_id": int(res_id),
+                "user_id": int(user_id),
+                "item_id": int(item_id),
+                "status": status,
+                "expired": timezone.now().timestamp() > int(expiry),
+            }
+        except (BadSignature, ValueError):
+            return {"valid": False}
 
     def __str__(self):
         return f"{self.user.username} - {self.item.name} ({self.status})"
@@ -173,7 +244,7 @@ class CirculationLog(models.Model):
         REJECTED = 'REJECTED', _('Rejected')
 
     reservation = models.ForeignKey(
-        Reservation, on_delete=models.CASCADE, related_name='circulation_logs'
+        Reservation, on_delete=models.PROTECT, related_name='circulation_logs'
     )
     actor = models.ForeignKey(
         CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='actions_logged'
@@ -191,3 +262,49 @@ class CirculationLog(models.Model):
 
     def __str__(self):
         return f"{self.get_action_type_display()} - Res #{self.reservation_id} by {self.actor or 'System'}"
+
+
+class SystemLog(models.Model):
+    class Severity(models.TextChoices):
+        INFO = 'INFO', _('Info')
+        WARNING = 'WARNING', _('Warning')
+        CRITICAL = 'CRITICAL', _('Critical')
+
+    class EventType(models.TextChoices):
+        TX_COMMIT = 'TX_COMMIT', _('Transaction Commit')
+        INTERVAL_CONFLICT = 'INTERVAL_CONFLICT', _('Interval Conflict Blocked')
+        ROW_LOCK = 'ROW_LOCK', _('Row Lock Acquired')
+        CAPACITY_UPDATE = 'CAPACITY_UPDATE', _('Live Capacity Update')
+        AUTH_EVENT = 'AUTH_EVENT', _('Authentication Event')
+        SCHEMA_AUDIT = 'SCHEMA_AUDIT', _('3NF Schema Audit')
+        INTEGRITY_CHECK = 'INTEGRITY_CHECK', _('SQLite Integrity Check')
+
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    event_type = models.CharField(max_length=30, choices=EventType.choices, db_index=True)
+    severity = models.CharField(max_length=10, choices=Severity.choices, default=Severity.INFO, db_index=True)
+    module = models.CharField(max_length=100, default='backend.core')
+    message = models.TextField()
+    execution_time_ms = models.FloatField(null=True, blank=True)
+    metadata = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['-timestamp']
+        verbose_name = 'System Log'
+        verbose_name_plural = 'System Logs'
+
+    def __str__(self):
+        return f"[{self.severity}] {self.event_type} @ {self.timestamp:%H:%M:%S}: {self.message[:60]}"
+
+
+def log_system_event(event_type, message, severity=SystemLog.Severity.INFO, module='backend.core', execution_time_ms=None, metadata=''):
+    try:
+        return SystemLog.objects.create(
+            event_type=event_type,
+            message=message,
+            severity=severity,
+            module=module,
+            execution_time_ms=execution_time_ms,
+            metadata=str(metadata),
+        )
+    except Exception:
+        return None
